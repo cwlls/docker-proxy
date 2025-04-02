@@ -1,0 +1,46 @@
+services:
+  whoami:
+    image: traefik/whoami
+    hostname: whoami
+    command:
+      - --name=whoami
+      - --port=2080
+    labels:
+      caddy: https://whoami.ts.rhza.net
+      caddy.reverse_proxy: "{{upstreams 2080}}"
+  caddy:
+    image: caddy-docker-proxy:porkbun
+    build: .
+    network_mode: "service:tailscale-caddy"
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - caddy_data:/data
+    labels:
+      caddy.acme_dns: porkbun
+      caddy.acme_dns.api_key: ${PORKBUN_API_KEY}
+      caddy.acme_dns.api_secret_key: ${PORKBUN_SECRET_KEY}
+
+  tailscale-caddy:
+    image: tailscale/tailscale
+    container_name: tailscale-caddy
+    restart: unless-stopped
+    cap_add:
+      - net_admin
+    volumes:
+      - ts_data:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    env_file:
+      - .env
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_EXTRA_ARGS=--login-server=https://ts.rhza.net --reset
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    hostname: whoami
+
+volumes:
+  caddy_data:
+  ts_data:
